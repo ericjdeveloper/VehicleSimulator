@@ -18,6 +18,12 @@ class Vector2:
     
     def orthogonal(self):
         return Vector2(-self.y, self.x)
+    
+    def intify(self):
+        return Vector2(int(self.x), int(self.y))
+    
+    def abs(self):
+        return Vector2(abs(self.x), abs(self.y))
 
     def __str__(self):
         return f"({self.x},{self.y})"
@@ -39,3 +45,12 @@ class Vector2:
         
     def __neg__(self):
         return Vector2(-self.x, -self.y)
+
+
+    @staticmethod
+    def Dot(a, b):
+        return a.x * b.x + a.y * b.y
+
+    @staticmethod
+    def Angle(a, b):
+        return math.acos(Vector2.Dot(a,b) / (a.magnitude * b.magnitude))
