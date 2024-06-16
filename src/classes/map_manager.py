@@ -10,23 +10,20 @@ class MapManager:
     def __init__(self):
         self.map = Map()
 
-    def add_node(self, pos: Vector2, fro: RoadNode = None, to: RoadNode = None):
+    def add_node(self, pos: Vector2, fro: RoadNode = None, to: RoadNode = None, lanes = (1,1)):
         con_from = None
         con_to = None
 
         if fro is not None:
-            con_from = fro.forward
-            if con_from is None:              
-                con_from = self.add_connector([fro])
-                fro.forward = con_from
+            if not fro.front.connected():
+                fro.front.connection = self.add_connector([fro])
+            con_from = fro.front.connection
 
         if to is not None:
-            con_to = to.backward
-            if con_to is None:                
-                con_to =self.add_connector([to])
-                to.backward = con_to
-
-        node = RoadNode(pos, con_from, con_to)
+            if not to.back.connected():    
+                self.add_connector([to])
+            con_to = to.back.connection
+        node = RoadNode(pos, con_from, con_to, lanes)
         self.map.nodes.append(node)     
         return node
 
@@ -70,7 +67,7 @@ class MapManager:
         for line in self.map.connectors:
             polygon_points = []
                         
-            for v in line.connections:
+            for v in line.nodes:
                 
                 org = v.get_facing().orthogonal()
                 polygon_points.append(
@@ -92,14 +89,13 @@ class MapManager:
             # print(point_list)
             pygame.draw.polygon(screen, (20,20,20), point_list, 0)
 
-
         
         for junc in self.map.connectors:
             # pygame.draw.rect(screen, (0,255,0), pygame.Rect(junc.position.x - 5, junc.position.y - 5, 10,10), 3)
             
             # offset = (node_b.position - node_a.position).normalized().orthogonal() * LANE_OFFSET
-            for node_a in junc.connections:
-                for node_b in junc.connections:
+            for node_a in junc.nodes:
+                for node_b in junc.nodes:
                     if node_a == node_b: continue
 
                     from_offset = node_a.get_facing().orthogonal() * LANE_OFFSET

@@ -1,8 +1,8 @@
 class Lane:
 
-    def __init__(self):
-        lane_texture = None
-        allowed_vehicles = []
+    def __init__(self, parent, index):
+        self.parent = parent
+        self.index = index
 
 class LaneBorder:
 

@@ -4,64 +4,59 @@ import math
 
 class Connector:pass
 
+
+
 class RoadNode:
 
-    def __init__(self, pos: Vector2, b=None, f=None, facing: Vector2=None):        
-        self.backward = None
-        self.forward = None
+    class ConnectorConnection:
+
+        def __init__(self, parent, connection, lane_directions=[]):
+            self.parent = parent
+            self.connection = connection
+            self.lane_directions = lane_directions
+
+        def join(self, con: Connector):
+            if self.connected():
+                self.connection.disconnect(self.parent)
+            
+            self.connection = con
+            if self.connected():
+                self.connection.connect(self.parent)
+
+        def connected(self):
+            return self.connection is not None
+
+    def __init__(self, pos: Vector2, b =None, f=None, lane_counts = (2,2), facing: Vector2=None):                
         self.position = pos
-        self.lanes = ([Lane(), Lane()],[Lane(), Lane()])
-        self.markers = []
+        self.lanes = ([Lane(self, l) for l in range(lane_counts[0])],[Lane(self, l) for l in range(lane_counts[1])])
+        self.back = self.ConnectorConnection(self, None, (self.lanes[0], self.lanes[1]))
+        self.front = self.ConnectorConnection(self, None, (self.lanes[1], self.lanes[0]))
 
         self.facing = facing
 
-        if f is not None: self.join_front(f)
-        if b is not None: self.join_back(b)
+        self.front.join(f)
+        self.back.join(b)
 
     def get_facing(self):
         if self.facing is not None:
             return self.facing
         
-        if self.backward is None and self.forward is None: return Vector2(0,1)
+        if not self.back.connected() and not self.front.connected(): return Vector2(0,1)
 
-        if self.backward is None:
-            return (self.forward.position - self.position).normalized()
+        if not self.front.connected():
+            return (self.front.connection.position - self.position).normalized()
         
-        if self.forward is None:
-            return (self.backward.position - self.position).normalized()
+        if not self.back.connected():
+            return (self.back.connection.position - self.position).normalized()
 
-        # a = Vector2.Angle((self.forward.position - self.position), (self.backward.position - self.position)) / 2
-        # print(math.degrees(a))
-        # x =  Vector2(math.cos(a) * self.forward.position.x - math.sin(a) * self.forward.position.y,
-        #                math.sin(a) * self.forward.position.x + math.cos(a) * self.forward.position.y)
-        # print(x)
-        # return x.normalized()
-        f = (self.forward.position - self.position).normalized()
-        b = (self.backward.position - self.position).normalized()
+
+        f = (self.front.connection.position - self.position).normalized()
+        b = (self.back.connection.position - self.position).normalized()
         face = (f + ((b - f) / 2)).orthogonal()
         if face.x == 0 and face.y == 0:
-            face = (self.forward.position - self.position)
+            face = (self.front.connection.position - self.position)
 
-        return face.normalized()
-        # return (self.forward.position - self.position).normalized()
-
-
-
-    def join_front(self, f: Connector):
-        if self.forward is not None:
-            self.forward.disconnect(self)
-
-        self.forward = f
-        if f is not None:            
-            self.forward.connect(self)
-
-    def join_back(self, b: Connector):
-        if self.backward is not None:
-            self.backward.disconnect(self)
-
-        self.backward = b
-        if b is not None:
-            self.backward.connect(self)
+        return face.normalized()        
 
 
         
