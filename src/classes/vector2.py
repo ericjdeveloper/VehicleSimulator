@@ -12,6 +12,10 @@ class Vector2:
     @property
     def magnitude(self):
         return math.sqrt(self.x**2 + self.y**2)
+    
+    @property
+    def slope(self):
+        return self.y / self.x
 
     def normalized(self):
         return self / self.magnitude
@@ -45,6 +49,9 @@ class Vector2:
         
     def __neg__(self):
         return Vector2(-self.x, -self.y)
+    
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
 
 
     @staticmethod

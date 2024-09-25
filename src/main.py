@@ -23,7 +23,7 @@ def draw_circle():
     
     j1 = mm.add_node(Vector2(350,250))
     j2 = mm.add_node(Vector2(150, 250))
-    mm.connect_nodes(j1, j2, (1,1), (1,1))
+    mm.connect_nodes(j1, j2, (2,2), (2,2))
 
     mm.connect_nodes(mm.map.nodes[int(res / 4)], j1, (1,1), (1,1))
     mm.connect_nodes(mm.map.nodes[int(3 * res / 4)], j2, (1,1), (1,1))

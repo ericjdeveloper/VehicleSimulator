@@ -3,9 +3,27 @@ from .lane import Lane
 import math
 import numpy
 
+from enum import IntEnum
+
+class Alignments(IntEnum):
+    INNER=-1
+    CENTER=0
+    OUTER=1
+
+class Direction(IntEnum):
+    OUT=1
+    IN=-1
+
+    @staticmethod
+    def opposite(d):
+        return d * -1
+
+
 class RoadNode:
 
     class Connector:
+
+        DEFAULT_ROAD_MARGIN=6
 
         def __init__(self, parent, lane_counts=(2,2), pos=None):
             self.position = None
@@ -14,8 +32,17 @@ class RoadNode:
                 self.position = pos            
 
             self.parent = parent
-            self.lanes = ([Lane(self, l) for l in range(lane_counts[0])],[Lane(self, l) for l in range(lane_counts[1])])
+            self.lanes = {Direction.OUT: [Lane(self, l) for l in range(lane_counts[0])],
+                          Direction.IN: [Lane(self, l) for l in range(lane_counts[1])]
+                        }
             self.connection = None
+            self.spacing = 0
+            self.margins = {
+                Direction.OUT: self.DEFAULT_ROAD_MARGIN,
+                Direction.IN: self.DEFAULT_ROAD_MARGIN
+            }
+            self.facing = None
+
 
         def join(self, con):
             if self.connected():
@@ -30,7 +57,31 @@ class RoadNode:
             if self.position is not None: return self.position
             return self.parent.position
 
+        def get_offset_position(self):
+            return self.get_position() + self.get_facing() * self.spacing
+        
+        def get_lane_offset(self, lane_index, direction = Direction.OUT, alg=Alignments.CENTER):
+            magnitude = 0
+            for i in range(lane_index):
+                magnitude += self.lanes[direction][i].width
+
+            if alg is Alignments.CENTER:
+                magnitude += int(self.lanes[direction][lane_index].width / 2)
+            elif alg is Alignments.OUTER:
+                magnitude += self.lanes[direction][lane_index].width
+            
+            return self.get_facing().orthogonal() * (magnitude * direction)
+
+        def get_edge(self, direction: Direction, include_margin=True):
+            width= self.get_lane_offset(len(self.lanes[direction]) -1, direction, Alignments.OUTER)
+
+            if include_margin: 
+                width += width.normalized() * self.margins[direction]
+
+            return width
+
         def get_facing(self):
+            if self.facing is not None: return self.facing
             if not self.connection: return Vector2(0,1)
             return (self.connection.get_position() - self.get_position()).normalized()
 
@@ -44,49 +95,36 @@ class RoadNode:
         self.connections.append(con)
         return con
 
-    def get_connected_matrix(self):
+    def get_connected_matrix(self, dir = Direction.OUT):
         if self.con_matrix is not None: return self.con_matrix
 
-        out_count = sum(len(x.lanes[0]) for x in self.connections)
-        in_count = sum(len(x.lanes[1]) for x in self.connections)
+        count = sum(len(x.lanes[dir]) for x in self.connections)
 
         mat = []
         for c1 in self.connections:            
-            for i in range(len(c1.lanes[1])):     
-                lane_row = [0] * out_count           
+            for i in range(len(c1.lanes[Direction.opposite(dir)])):     
+                lane_row = [0] * count           
                 for c in self.connections:
-                    
-                    if len(c.lanes[0]) > i:
-                        ind = self.get_out_index_by_lane(c.lanes[0][i])
+
+                    if len(c.lanes[dir]) > i:
+                        ind = self.get_index_by_lane(c.lanes[dir][i])
                         lane_row[ind] = 1
             
                 mat.append(lane_row)
             
         return mat
 
-    def get_out_index_by_lane(self, lane):
-        all_lanes = [a for x in self.connections for a in x.lanes[0]]
+    def get_index_by_lane(self, lane, direction=Direction.OUT):
+        all_lanes = [a for x in self.connections for a in x.lanes[direction]]
         return all_lanes.index(lane)
-
-    def get_in_index_by_lane(self, lane):
-        all_lanes = [a for x in self.connections for a in x.lanes[1]]
-        return all_lanes.index(lane)
-
-    def get_in_lane_by_index(self, index):
-        prev_top = 0
-
-        for cc in self.connections:
-            if prev_top + len(cc.lanes[1]) > index:
-                return cc.lanes[1][index - prev_top], index - prev_top
-            prev_top += len(cc.lanes[1])            
-
-    def get_out_lane_by_index(self, index):
+    
+    def get_lane_by_index(self, index, direction=Direction.OUT):
         prev_top = 0
         
         for cc in self.connections:
-            if prev_top + len(cc.lanes[0]) > index:
-                return cc.lanes[0][index - prev_top], index - prev_top
-            prev_top += len(cc.lanes[0])  
+            if prev_top + len(cc.lanes[direction]) > index:
+                return cc.lanes[direction][index - prev_top], index - prev_top
+            prev_top += len(cc.lanes[direction])       
 
 
 

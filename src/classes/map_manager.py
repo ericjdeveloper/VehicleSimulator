@@ -2,7 +2,7 @@ import pygame
 
 from .map import Map
 from .vector2 import Vector2
-from .road_node import RoadNode
+from .road_node import RoadNode, Alignments, Direction
 import math
 
 class MapManager:
@@ -40,8 +40,7 @@ class MapManager:
     def run_game(self):
         pygame.init()
         screen = pygame.display.set_mode([500,500])
-
-
+        self.map.screen = screen
         self.display(screen)
 
         running = True
@@ -52,12 +51,15 @@ class MapManager:
 
         pygame.quit()
 
-    def display(self, screen):
-       
+    def display(self, screen):       
+        def point_sorter(point, center):                
+            d = (point - center)
+            return math.atan2(d.x, d.y)
+
         def draw_line(fro: Vector2, to: Vector2, color, thickness, is_dashed = False):
             if not is_dashed:
                 pygame.draw.line(screen, color, fro.to_list(), to.to_list(), thickness)
-                return
+                
             
             diff_vec = fro - to
             dist  = diff_vec.magnitude
@@ -69,81 +71,101 @@ class MapManager:
                 end_pos = min(start_pos + line_length / dist, 1)
                 pygame.draw.line(screen, color, (fro - diff_vec * start_pos).to_list(), (fro - diff_vec * end_pos).to_list(), thickness)
                 c_pos += line_length + gap_length
-        screen.fill((255,255,255))
+        screen.fill((255,255,255))        
 
-        LANE_OFFSET = 15
-        ROAD_BORDER = 0
-        for point in self.map.nodes:            
+        def draw_junction(junc):
+
+            if len(junc.connections) < 2: return
+
             polygon_points = []
-                     
-            for con in point.connections: 
-                continue               
-                org = con.get_facing().orthogonal()
+            for con in junc.connections:
                 polygon_points.append(
-                        (con.get_position() - org * ((LANE_OFFSET * (len(con.lanes[0]) + 0.5)) + ROAD_BORDER))
+                        (con.get_offset_position() + con.get_edge(Direction.OUT))
                     )
                 polygon_points.append(
-                        (con.get_position() + org * ((LANE_OFFSET * (len(con.lanes[1]) + 0.5)) + ROAD_BORDER))
-                    )
-            if len(polygon_points) == 2: continue
+                        (con.get_offset_position() + con.get_edge(Direction.IN))
+                    ) 
 
-            p = point.position
-            def point_sorter(point):                
-                # return Vector2.angle(point - p, Vector2(1,0))
-                d = (point - p)
-                return math.atan2(d.x, d.y)
-            
-            polygon_points.sort(key=point_sorter)
+            polygon_points.sort(key=lambda a: point_sorter(a, junc.position))
 
             point_list = [p.to_list() for p in polygon_points]
-            # print(point_list)
-            pygame.draw.polygon(screen, (20,20,20), point_list, 0)
+            pygame.draw.polygon(screen, (20,20,20), point_list)            
 
-            for con in point.connections: 
+        # draw roads
+        def draw_roads(node):
+            for con in node.connections:                 
                 polygon_points = []             
-                con2 = con.connection
-                if con2 is None: continue
 
-                org = con.get_facing().orthogonal()
-                org2 = con2.get_facing().orthogonal()
+                if con.connection is None: continue
+
                 polygon_points.append(
-                        (con.get_position() - org * ((LANE_OFFSET * (len(con.lanes[0]) + 0.5)) + ROAD_BORDER))
+                        (con.get_offset_position() + con.get_edge(Direction.OUT))
                     )
                 polygon_points.append(
-                        (con.get_position() + org * ((LANE_OFFSET * (len(con.lanes[1]) + 0.5)) + ROAD_BORDER))
+                        (con.get_offset_position() + con.get_edge(Direction.IN))
                     )
                 
                 polygon_points.append(
-                        (con2.get_position() - org2 * ((LANE_OFFSET * (len(con2.lanes[0]) + 0.5)) + ROAD_BORDER))
+                        (con.connection.get_offset_position() + con.connection.get_edge(Direction.IN))
                     )
                 polygon_points.append(
-                        (con2.get_position() + org2 * ((LANE_OFFSET * (len(con2.lanes[1]) + 0.5)) + ROAD_BORDER))
+                        (con.connection.get_offset_position() + con.connection.get_edge(Direction.OUT))
                     )                        
             
-                polygon_points.sort(key=point_sorter)
-
+                polygon_points.sort(key=lambda a: point_sorter(a, node.position))
+                
                 point_list = [p.to_list() for p in polygon_points]
                 # print(point_list)
-                pygame.draw.polygon(screen, (20,20,20), point_list, 0)
-        
-        for junc in self.map.nodes:   
+                pygame.draw.polygon(screen, (20,20,20), point_list)
             
-            # pygame.draw.rect(screen, (0,255,0), pygame.Rect(junc.position.x - 5, junc.position.y - 5, 10,10), 3)
+        def draw_intersection_lanes(node): 
+
+            m = node.get_connected_matrix()
+
+            cons = list(range(len(node.connections)))
+            cons.sort(key=lambda a: point_sorter(node.connections[a].get_offset_position(), node.position))
+
+            for i in cons:
+                con_a = node.connections[i]
+                con_b = node.connections[(i - 1) % len(node.connections)]
+
+                pos_a = con_a.get_offset_position() + con_a.get_edge(Direction.OUT, include_margin=False)
+                pos_b = con_b.get_offset_position() + con_b.get_edge(Direction.IN, include_margin=False)
+
+                draw_line(pos_a, pos_b, (200,200,200), 3)                
+                
+
+            if len(node.connections) == 2:
+                    
+                con_a = node.connections[0]
+                con_b = node.connections[1]
+
+                pygame.draw.line(screen, (247,181,0), (con_a.get_offset_position()).to_list(), (con_b.get_offset_position()).to_list(), 3)
+
+                for dir in Direction:
+                    for l in range(len(con_a.lanes[dir]) -1,):       
+                        from_offset = con_a.get_lane_offset(l, dir, Alignments.OUTER)
+                        to_offset = con_b.get_lane_offset(l, Direction.opposite(dir), Alignments.OUTER) 
+
+                        draw_line((con_a.get_offset_position() + from_offset),
+                                (con_b.get_offset_position() + to_offset),
+                                    (200,200,200),
+                                    2,
+                                    True
+                                    )
+                    
+                return
             
-            # offset = (node_b.position - con_a.position).normalized().orthogonal() * LANE_OFFSET
-            m = junc.get_connected_matrix()
-            for i in range(len(m)): 
-                continue
-                print(i, m[i])
-                lane_a, l_a = junc.get_in_lane_by_index(i)
-                lanes = [junc.get_out_lane_by_index(j) for j, x in enumerate(m[i]) if x == 1]
+            # for i in range(len(m)):
+            #     lane_a, l_a = node.get_lane_by_index(i, Direction.IN)
+            #     lanes = [node.get_lane_by_index(j, Direction.OUT) for j in range(len(m[i])) if m[i][j] == 1]
 
+                
+            #     for lane_b, l_b in lanes:
+            #         from_offset = lane_a.parent.get_edge(Direction.OUT, include_margin=False)
+            #         to_offset = lane_b.parent.get_edge(Direction.IN, include_margin=False)
 
-                for lane_b, l_b in lanes:
-                    from_offset = lane_a.parent.get_facing().orthogonal() * LANE_OFFSET
-                    to_offset = lane_b.parent.get_facing().orthogonal() * LANE_OFFSET
-
-                    pygame.draw.line(screen, (10,200,50), (lane_a.parent.get_position() - from_offset * (l_a + 0.5)).to_list(), (lane_b.parent.get_position() + to_offset * (l_b + 0.5)).to_list(), 6)
+            #         draw_line(lane_a.parent.get_offset_position() - from_offset * (l_a + 0.5), lane_b.parent.get_offset_position() + to_offset * (l_b + 0.5), (10,200,50), 2)
 
                 # for con_b in junc.connections:
                 #     if con_a == con_b: continue
@@ -151,35 +173,50 @@ class MapManager:
                 #     from_offset = con_a.get_facing().orthogonal() * LANE_OFFSET
                 #     to_offset = con_b.get_facing().orthogonal() * LANE_OFFSET
                     
-                #     for l in range(len(con_a.lanes[0])):
+                #     for l in range(len(con_a.lanes[Direction.OUT])):
                 #         # pygame.draw.line(screen, (10,50,200), (con_a.position - offset * (l + 0.5)).to_list(), (node_b.position - offset * (l + 0.5)).to_list(), 6)
                 #         pygame.draw.line(screen, (10,50,200), (con_a.get_position() - from_offset * (l + 0.5)).to_list(), (con_b.get_position() + to_offset * (l + 0.5)).to_list(), 6)
                 
-                #     for l in range(len(con_b.lanes[1])):
+                #     for l in range(len(con_b.lanes[Direction.IN])):
                 #         # pygame.draw.line(screen, (10,200,50), (con_a.position + offset * (l + 0.5)).to_list(), (node_b.position + offset * (l + 0.5)).to_list(), 6)
                 #         pygame.draw.line(screen, (10,200,50), (con_a.get_position() + from_offset * (l + 0.5)).to_list(), (con_b.get_position() - to_offset * (l + 0.5)).to_list(), 6)
-                
-            for con in junc.connections:
+
+        def draw_road_lanes(node):
+            for con in node.connections:                
                 con_a = con
                 con_b = con.connection
 
-                pygame.draw.line(screen, (247,181,0), (con_a.get_position()).to_list(), (con_b.get_position()).to_list(), 3)
+                pygame.draw.line(screen, (247,181,0), con_a.get_offset_position().to_list(), con_b.get_offset_position().to_list(), 3)
 
-                from_offset = con_a.get_facing().orthogonal() * LANE_OFFSET
-                to_offset = con_b.get_facing().orthogonal() * LANE_OFFSET
-                for l in range(len(con_a.lanes[0])):         
+                for l in range(len(con_a.lanes[Direction.OUT])):     
+
                     thickness = 2
                     dashed = True
 
-                    if l+1 == len(con_a.lanes[0]):
+                    if l+1 == len(con_a.lanes[Direction.OUT]):
                         thickness = 3
                         dashed = False
 
-                    draw_line((con_a.get_position() + from_offset * (l + 1)),
-                               (con_b.get_position()- to_offset * (l + 1)),
+                    from_offset = con_a.get_lane_offset(l, Direction.OUT, Alignments.OUTER)
+                    to_offset = con_b.get_lane_offset(l, Direction.IN, Alignments.OUTER)  
+
+                    draw_line((con_a.get_offset_position() + from_offset),
+                               (con_b.get_offset_position() + to_offset),
                                 (200,200,200),
                                  thickness,
                                  dashed
                                 )
 
+
+        self.map.calculate_offsets()
+
+        for node in self.map.nodes:            
+            draw_junction(node)
+            draw_roads(node)
+
+        for node in self.map.nodes:            
+            draw_intersection_lanes(node)
+            draw_road_lanes(node)
+
+                        
         pygame.display.flip()
