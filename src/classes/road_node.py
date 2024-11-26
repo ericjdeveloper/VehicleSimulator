@@ -1,22 +1,8 @@
 from .vector2 import Vector2
+from .enums import *
 from .lane import Lane
 import math
 import numpy
-
-from enum import IntEnum
-
-class Alignments(IntEnum):
-    INNER=-1
-    CENTER=0
-    OUTER=1
-
-class Direction(IntEnum):
-    OUT=1
-    IN=-1
-
-    @staticmethod
-    def opposite(d):
-        return d * -1
 
 
 class RoadNode:
@@ -48,7 +34,7 @@ class RoadNode:
             if self.connected():
                 self.connection.disconnect(self.parent)
             
-            self.connection = con
+            self.connection = con        
 
         def connected(self):
             return self.connection is not None
@@ -85,6 +71,9 @@ class RoadNode:
             if not self.connection: return Vector2(0,1)
             return (self.connection.get_position() - self.get_position()).normalized()
 
+        def is_passed(self, point: Vector2, dir = Direction.OUT):
+            return Vector2.Dot(self.get_facing() * dir, point - self.get_offset_position()) < 0
+
     def __init__(self, pos: Vector2):
         self.position = pos
         self.connections = []  
@@ -98,20 +87,20 @@ class RoadNode:
     def get_connected_matrix(self, dir = Direction.OUT):
         if self.con_matrix is not None: return self.con_matrix
 
-        count = sum(len(x.lanes[dir]) for x in self.connections)
+        opp_lanes = sum(len(x.lanes[dir.opposite()]) for x in self.connections)
+        dir_lanes = sum(len(x.lanes[dir]) for x in self.connections)
+        mat = [[0 for j in range(opp_lanes)] for k in range(dir_lanes)]
 
-        mat = []
-        for c1 in self.connections:            
-            for i in range(len(c1.lanes[Direction.opposite(dir)])):     
-                lane_row = [0] * count           
-                for c in self.connections:
+        for c1 in range(len(self.connections)):
+            for c2 in range(len(self.connections)):
+                if c1 == c2: continue
 
-                    if len(c.lanes[dir]) > i:
-                        ind = self.get_index_by_lane(c.lanes[dir][i])
-                        lane_row[ind] = 1
-            
-                mat.append(lane_row)
-            
+                for l_i in range(len(self.connections[c1].lanes[dir])):
+                    opp = self.connections[c2].lanes[dir.opposite()]
+                    ind = self.get_index_by_lane(opp[min(l_i, len(opp) - 1)], dir.opposite())
+                    mat[l_i][ind] = 1
+
+        
         return mat
 
     def get_index_by_lane(self, lane, direction=Direction.OUT):

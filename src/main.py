@@ -32,8 +32,9 @@ def draw_circle():
 
 def single_road():
     a = mm.add_node(Vector2(100,100))
-    b = mm.add_node(Vector2(250,250),a)
-    c = mm.add_node(Vector2(400,100),b)
+    b = mm.add_node(Vector2(200,250),[a])
+    c = mm.add_node(Vector2(300,250),[b], [1,2])
+    d = mm.add_node(Vector2(400,100),[c])
 
 draw_circle()
 # single_road()

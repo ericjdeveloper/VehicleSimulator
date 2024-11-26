@@ -28,6 +28,10 @@ class Vector2:
     
     def abs(self):
         return Vector2(abs(self.x), abs(self.y))
+    
+    def rotate(self, degrees):
+        rads = math.radians(degrees)
+        return Vector2(self.x * math.cos(rads) - self.y * math.sin(rads), self.y * math.cos(rads) + self.x * math.sin(rads))
 
     def __str__(self):
         return f"({self.x},{self.y})"

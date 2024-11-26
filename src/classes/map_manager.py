@@ -3,7 +3,10 @@ import pygame
 from .map import Map
 from .vector2 import Vector2
 from .road_node import RoadNode, Alignments, Direction
+from .agent import Agent
+from time import sleep
 import math
+
 
 class MapManager:
 
@@ -16,7 +19,7 @@ class MapManager:
 
         for n in connected_nodes:
             if n is None: continue
-            self.connect_nodes(node, n, lanes, lanes)
+            self.connect_nodes(node, n, lanes, list(reversed(lanes)))
 
         self.map.nodes.append(node)     
         return node
@@ -41,13 +44,19 @@ class MapManager:
         pygame.init()
         screen = pygame.display.set_mode([500,500])
         self.map.screen = screen
-        self.display(screen)
+        
+        self.a = Agent(Vector2(50,100))
+        self.a.lane = self.map.nodes[0].connections[0].lanes[Direction.IN][0]
 
         running = True
         while running:
+            self.a.tick()
+            self.display(screen)
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+            
 
         pygame.quit()
 
@@ -145,7 +154,7 @@ class MapManager:
                 for dir in Direction:
                     for l in range(len(con_a.lanes[dir]) -1,):       
                         from_offset = con_a.get_lane_offset(l, dir, Alignments.OUTER)
-                        to_offset = con_b.get_lane_offset(l, Direction.opposite(dir), Alignments.OUTER) 
+                        to_offset = con_b.get_lane_offset(l, dir.opposite(), Alignments.OUTER) 
 
                         draw_line((con_a.get_offset_position() + from_offset),
                                 (con_b.get_offset_position() + to_offset),
@@ -187,7 +196,7 @@ class MapManager:
                 con_b = con.connection
 
                 pygame.draw.line(screen, (247,181,0), con_a.get_offset_position().to_list(), con_b.get_offset_position().to_list(), 3)
-
+                
                 for l in range(len(con_a.lanes[Direction.OUT])):     
 
                     thickness = 2
@@ -214,9 +223,11 @@ class MapManager:
             draw_junction(node)
             draw_roads(node)
 
-        for node in self.map.nodes:            
+        for node in self.map.nodes:                        
             draw_intersection_lanes(node)
             draw_road_lanes(node)
 
-                        
+
+        self.a.draw(screen)        
+
         pygame.display.flip()
