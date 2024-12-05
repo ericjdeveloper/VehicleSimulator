@@ -18,8 +18,8 @@ class RoadNode:
                 self.position = pos            
 
             self.parent = parent
-            self.lanes = {Direction.OUT: [Lane(self, l) for l in range(lane_counts[0])],
-                          Direction.IN: [Lane(self, l) for l in range(lane_counts[1])]
+            self.lanes = {Direction.OUT: [Lane(self, l, Direction.OUT) for l in range(lane_counts[0])],
+                          Direction.IN: [Lane(self, l, Direction.IN) for l in range(lane_counts[1])]
                         }
             self.connection = None
             self.spacing = 0
@@ -98,10 +98,12 @@ class RoadNode:
                 for l_i in range(len(self.connections[c1].lanes[dir])):
                     opp = self.connections[c2].lanes[dir.opposite()]
                     ind = self.get_index_by_lane(opp[min(l_i, len(opp) - 1)], dir.opposite())
-                    mat[l_i][ind] = 1
+                    lane_index = self.get_index_by_lane(self.connections[c1].lanes[dir][l_i])
+                    mat[lane_index][ind] = 1
 
-        
-        return mat
+
+        self.con_matrix = mat
+        return self.con_matrix
 
     def get_index_by_lane(self, lane, direction=Direction.OUT):
         all_lanes = [a for x in self.connections for a in x.lanes[direction]]

@@ -42,16 +42,38 @@ class MapManager:
 
     def run_game(self):
         pygame.init()
+        pygame.font.init()
+
         screen = pygame.display.set_mode([500,500])
-        self.map.screen = screen
+        self.map.screen = pygame.surface.Surface([500,500], pygame.SRCALPHA)
+        self.display(self.map.screen)
         
-        self.a = Agent(Vector2(50,100))
-        self.a.lane = self.map.nodes[0].connections[0].lanes[Direction.IN][0]
+        game_time = pygame.time.Clock()
+        
+        font = pygame.font.SysFont('Arial', 10)
+
+        self.a = [ Agent(Vector2(50,100)) for a in range(50) ] 
+        for a in self.a:
+            a.set_target(self.map.nodes[0].connections[0].lanes[Direction.IN][0])
 
         running = True
         while running:
-            self.a.tick()
-            self.display(screen)
+            game_time.tick(60)
+            # process changes
+            for a in self.a:
+                a.tick(game_time.get_time() / 1000)
+
+            # draw items
+            screen.fill((255,255,255))
+            screen.blit(self.map.screen, (0,0))  
+
+            text_surf = font.render(f"{game_time.get_fps():.2f}", True, "grey0")
+            screen.blit(text_surf, (0,0))
+
+            for a in self.a:          
+                a.draw(screen)
+            
+            pygame.display.flip()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -79,8 +101,7 @@ class MapManager:
                 start_pos = c_pos / dist
                 end_pos = min(start_pos + line_length / dist, 1)
                 pygame.draw.line(screen, color, (fro - diff_vec * start_pos).to_list(), (fro - diff_vec * end_pos).to_list(), thickness)
-                c_pos += line_length + gap_length
-        screen.fill((255,255,255))        
+                c_pos += line_length + gap_length                
 
         def draw_junction(junc):
 
@@ -226,8 +247,3 @@ class MapManager:
         for node in self.map.nodes:                        
             draw_intersection_lanes(node)
             draw_road_lanes(node)
-
-
-        self.a.draw(screen)        
-
-        pygame.display.flip()
